@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>五角洲行動</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #111;
+            color: white;
+        }
+        canvas {
+            display: block;
+        }
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            display: flex;
+            justify-content: space-between;
+            z-index: 100;
+            font-size: 24px;
+            text-shadow: 2px 2px 4px #000000;
+        }
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 10px;
+            height: 10px;
+            border: 2px solid white;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            mix-blend-mode: difference;
+            display: none; /* 預設隱藏準心 */
+        }
+        #blocker {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        #instructions {
+            width: 80%;
+            max-width: 600px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            font-size: 18px;
+        }
+        .menu {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+        }
+        .instruction-title {
+            font-size: 36px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        #cheat-status {
+            color: #00ff00;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px #000;
+            display: none; /* 預設隱藏 */
+        }
+        .leaderboard {
+            margin-top: 30px;
+            width: 80%;
+            max-width: 400px;
+            border: 1px solid #fff;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        .leaderboard h2 {
+            margin-top: 0;
+            font-size: 24px;
+            color: #00ffff;
+        }
+        .leaderboard ol {
+            padding-left: 20px;
+            list-style: decimal;
+            text-align: left;
+        }
+        .leaderboard li {
+            font-size: 18px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .play-again-btn {
+            padding: 12px 25px;
+            font-size: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            background-color: #00ffff;
+            color: #111;
+            border: none;
+            border-radius: 5px;
+            margin-top: 20px;
+            transition: background-color 0.3s;
+        }
+        .play-again-btn:hover {
+            background-color: #ffffff;
+        }
+        .back-btn {
+            background-color: #f44336; /* Red */
+            margin-top: 10px;
+        }
+        .back-btn:hover {
+            background-color: #ff5c5c;
+        }
+        .name-input {
+            margin-top: 15px;
+            padding: 10px;
+            font-size: 16px;
+            width: 200px;
+            text-align: center;
+        }
+        .submit-score-btn {
+             padding: 8px 15px;
+             margin-left: 10px;
+             cursor: pointer;
+        }
+        .setting-row {
+            margin-top: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+        .setting-row label {
+            margin-right: 10px;
+        }
+        .setting-row input[type="range"] {
+            width: 150px;
+            cursor: pointer;
+        }
+        .setting-row span {
+            margin-left: 10px;
+            min-width: 35px;
+            text-align: left;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div id="blocker">
+        <div id="instructions">
+            <!-- Start Menu -->
+            <div id="start-menu" class="menu">
+                <p class="instruction-title">五角洲行動</p>
+                <p>在 60 秒內盡可能獲得高分！</p>
+                <p>移動滑鼠：瞄準 | 點擊左鍵：射擊 | 按 C 鍵：全自動模式</p>
+                <p>作者：呂雨騰</p>
+                <div class="setting-row">
+                    <label for="sensitivity-slider">靈敏度：</label>
+                    <input type="range" id="sensitivity-slider" min="0.1" max="3" step="0.1" value="1">
+                    <span id="sensitivity-value">1.0</span>
+                </div>
+                <button class="play-again-btn" id="start-btn">開始遊戲</button>
+                <div class="leaderboard" id="leaderboard-start">
+                    <h2>排行榜</h2>
+                    <ol id="leaderboard-list-start"></ol>
+                </div>
+            </div>
+
+            <!-- Pause Menu -->
+            <div id="pause-menu" class="menu" style="display: none;">
+                 <p class="instruction-title">遊戲已暫停</p>
+                 <button class="play-again-btn" id="resume-btn">繼續遊戲</button>
+                 <button class="play-again-btn back-btn" id="back-to-menu-btn">返回主選單</button>
+            </div>
+
+            <!-- End Menu -->
+            <div id="end-menu" class="menu" style="display: none;">
+                <p class="instruction-title">遊戲結束！</p>
+                <p>你的分數是：<span id="final-score-val">0</span></p>
+                <div>
+                    <input type="text" id="name-input" class="name-input" placeholder="輸入你的名字" maxlength="10">
+                    <button id="submit-score-btn" class="play-again-btn submit-score-btn">儲存分數</button>
+                </div>
+                <button class="play-again-btn" id="play-again-btn">再玩一次</button>
+                <div class="leaderboard" id="leaderboard-end">
+                    <h2>排行榜</h2>
+                    <ol id="leaderboard-list-end"></ol>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="info">
+        <div>分數：<span id="score">0</span><span id="cheat-status">全自動模式已啟用</span></div>
+        <div>時間：<span id="timer">60</span></div>
+    </div>
+    <div id="crosshair"></div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+
+        let scene, camera, renderer, controls, clock;
+        let score, cheatMode, lastShotTime, timerValue, timerInterval;
+        let targets = [], bullets = [];
+        let gameState = 'waiting'; // 'waiting', 'playing', 'ended'
+
+        const shootDirection = new THREE.Vector3();
+        const bulletVelocity = 350;
+        const raycaster = new THREE.Raycaster();
+        
+        const blocker = document.getElementById('blocker');
+        const scoreElement = document.getElementById('score');
+        const cheatStatusElement = document.getElementById('cheat-status');
+        const timerElement = document.getElementById('timer');
+        const crosshair = document.getElementById('crosshair');
+        
+        // Menu elements
+        const startMenu = document.getElementById('start-menu');
+        const pauseMenu = document.getElementById('pause-menu');
+        const endMenu = document.getElementById('end-menu');
+
+        // Setting elements
+        const sensitivitySlider = document.getElementById('sensitivity-slider');
+        const sensitivityValue = document.getElementById('sensitivity-value');
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x1a2a3a);
+            scene.fog = new THREE.Fog(0x1a2a3a, 0, 500);
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.y = 10;
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.shadowMap.enabled = true;
+            document.body.appendChild(renderer.domElement);
+
+            clock = new THREE.Clock();
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(10, 20, 5);
+            directionalLight.castShadow = true;
+            scene.add(directionalLight);
+
+            const groundGeometry = new THREE.PlaneGeometry(1000, 1000);
+            const groundMaterial = new THREE.MeshStandardMaterial({ color: 0x334455 });
+            const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+            ground.rotation.x = -Math.PI / 2;
+            ground.receiveShadow = true;
+            scene.add(ground);
+            
+            controls = new PointerLockControls(camera, document.body);
+            controls.addEventListener('lock', () => {
+                blocker.style.display = 'none';
+                crosshair.style.display = 'block';
+
+                if (gameState !== 'playing') {
+                    setupNewGame();
+                }
+
+                clearInterval(timerInterval); 
+                timerInterval = setInterval(() => {
+                    timerValue--;
+                    timerElement.innerText = timerValue;
+                    if (timerValue <= 0) {
+                        endGame();
+                    }
+                }, 1000);
+            });
+            controls.addEventListener('unlock', () => {
+                blocker.style.display = 'flex';
+                crosshair.style.display = 'none';
+                clearInterval(timerInterval); 
+                
+                if (gameState === 'playing') { // Paused
+                    startMenu.style.display = 'none';
+                    pauseMenu.style.display = 'flex';
+                    endMenu.style.display = 'none';
+                } else if (gameState === 'ended') { // Game Over
+                    startMenu.style.display = 'none';
+                    pauseMenu.style.display = 'none';
+                    endMenu.style.display = 'flex';
+                } else { // Waiting to start
+                    startMenu.style.display = 'flex';
+                    pauseMenu.style.display = 'none';
+                    endMenu.style.display = 'none';
+                }
+            });
+            scene.add(controls.getObject());
+
+            // --- 靈敏度設定 ---
+            const savedSensitivity = localStorage.getItem('shooterSensitivity') || '1.0';
+            sensitivitySlider.value = savedSensitivity;
+            sensitivityValue.textContent = parseFloat(savedSensitivity).toFixed(1);
+            controls.pointerSpeed = parseFloat(savedSensitivity);
+
+            sensitivitySlider.addEventListener('input', () => {
+                const sensitivity = parseFloat(sensitivitySlider.value);
+                controls.pointerSpeed = sensitivity;
+                sensitivityValue.textContent = sensitivity.toFixed(1);
+                localStorage.setItem('shooterSensitivity', sensitivity.toString());
+            });
+
+            // --- 按鈕事件監聽 ---
+            document.getElementById('start-btn').addEventListener('click', () => controls.lock());
+            document.getElementById('play-again-btn').addEventListener('click', () => controls.lock());
+            document.getElementById('resume-btn').addEventListener('click', () => controls.lock());
+            document.getElementById('back-to-menu-btn').addEventListener('click', returnToMainMenu);
+            
+            document.getElementById('submit-score-btn').addEventListener('click', () => {
+                const nameInput = document.getElementById('name-input');
+                const finalScoreSpan = document.getElementById('final-score-val');
+                if (nameInput && finalScoreSpan) {
+                     const name = nameInput.value.trim() || '匿名玩家';
+                     const finalScore = parseInt(finalScoreSpan.textContent, 10);
+                     saveScore(name, finalScore);
+                     updateLeaderboardDisplay();
+                     document.getElementById('submit-score-btn').disabled = true;
+                     nameInput.disabled = true;
+                }
+            });
+            
+            window.addEventListener('keydown', onKeyDown);
+            window.addEventListener('mousedown', onMouseDown);
+            window.addEventListener('resize', onWindowResize);
+            
+            updateLeaderboardDisplay();
+            animate();
+        }
+
+        function setupNewGame() {
+            score = 0;
+            scoreElement.innerText = score;
+            cheatMode = false;
+            lastShotTime = 0;
+            cheatStatusElement.style.display = 'none';
+            timerValue = 60;
+            timerElement.innerText = timerValue;
+            gameState = 'playing';
+            
+            targets.forEach(t => scene.remove(t));
+            bullets.forEach(b => scene.remove(b));
+            targets.length = 0;
+            bullets.length = 0;
+
+            for (let i = 0; i < 20; i++) {
+                createTarget();
+            }
+        }
+
+        function endGame() {
+            gameState = 'ended';
+            document.getElementById('final-score-val').textContent = score;
+            
+            const nameInput = document.getElementById('name-input');
+            const submitBtn = document.getElementById('submit-score-btn');
+            if(nameInput) nameInput.value = '';
+            if(nameInput) nameInput.disabled = false;
+            if(submitBtn) submitBtn.disabled = false;
+
+            updateLeaderboardDisplay();
+            controls.unlock();
+        }
+
+        function returnToMainMenu() {
+            gameState = 'waiting';
+
+            // Switch from pause menu to start menu
+            pauseMenu.style.display = 'none';
+            startMenu.style.display = 'flex';
+
+            // Clean up game objects from the aborted game
+            targets.forEach(t => scene.remove(t));
+            bullets.forEach(b => scene.remove(b));
+            targets.length = 0;
+            bullets.length = 0;
+
+            // Reset UI display for the next game
+            timerElement.innerText = 60;
+            scoreElement.innerText = 0;
+        }
+        
+        function getLeaderboard() {
+            try {
+                return JSON.parse(localStorage.getItem('shooterLeaderboard')) || [];
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function saveScore(name, score) {
+            const leaderboard = getLeaderboard();
+            leaderboard.push({ name, score });
+            leaderboard.sort((a, b) => b.score - a.score);
+            leaderboard.splice(10);
+            localStorage.setItem('shooterLeaderboard', JSON.stringify(leaderboard));
+        }
+
+        function updateLeaderboardDisplay() {
+            const leaderboard = getLeaderboard();
+            const listStart = document.getElementById('leaderboard-list-start');
+            const listEnd = document.getElementById('leaderboard-list-end');
+            const content = leaderboard.map(s => `<li><span>${s.name}</span><span>${s.score}</span></li>`).join('');
+            if(listStart) listStart.innerHTML = content;
+            if(listEnd) listEnd.innerHTML = content;
+        }
+
+        const targetGeometry = new THREE.SphereGeometry(2, 32, 16);
+        function createTarget() {
+            const targetMaterial = new THREE.MeshStandardMaterial({ 
+                color: new THREE.Color(Math.random(), Math.random(), Math.random()),
+                roughness: 0.5,
+                metalness: 0.2
+            });
+            const target = new THREE.Mesh(targetGeometry, targetMaterial);
+            target.castShadow = true;
+            target.position.set(
+                (Math.random() - 0.5) * 200,
+                Math.random() * 30 + 5,
+                (Math.random() - 0.5) * 200
+            );
+            scene.add(target);
+            targets.push(target);
+        }
+
+        const bulletGeometry = new THREE.SphereGeometry(0.3, 8, 8);
+        const bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+
+        function fireBullet() {
+            if (controls.isLocked !== true) return;
+            const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
+            camera.getWorldPosition(bullet.position);
+            camera.getWorldDirection(shootDirection);
+
+            if (cheatMode && targets.length > 0) {
+                let closestTarget = null;
+                let minAngle = Math.PI / 4; 
+                const cameraDirection = new THREE.Vector3();
+                camera.getWorldDirection(cameraDirection);
+                for (const target of targets) {
+                    const targetDirection = target.position.clone().sub(bullet.position).normalize();
+                    const angle = cameraDirection.angleTo(targetDirection);
+                    if (angle < minAngle) {
+                        minAngle = angle;
+                        closestTarget = target;
+                    }
+                }
+                if (closestTarget) {
+                    shootDirection.subVectors(closestTarget.position, bullet.position).normalize();
+                }
+            }
+
+            bullet.position.add(shootDirection.clone().multiplyScalar(2));
+            const currentVelocity = cheatMode ? bulletVelocity * 10 : bulletVelocity;
+            bullet.velocity = new THREE.Vector3().copy(shootDirection).multiplyScalar(currentVelocity);
+            scene.add(bullet);
+            bullets.push(bullet);
+        }
+
+        function onKeyDown(event) {
+            if (event.key.toLowerCase() === 'c') {
+                cheatMode = !cheatMode;
+                cheatStatusElement.style.display = cheatMode ? 'inline' : 'none';
+            }
+        }
+
+        function onMouseDown() {
+            if (controls.isLocked === true && !cheatMode && gameState === 'playing') {
+                fireBullet();
+            }
+        }
+        
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+
+            if (gameState === 'playing') {
+                if (cheatMode && controls.isLocked && targets.length > 0) {
+                    let closestTarget = null;
+                    let minDistance = Infinity;
+                    const playerPosition = new THREE.Vector3();
+                    camera.getWorldPosition(playerPosition);
+
+                    for (const target of targets) {
+                        const distance = playerPosition.distanceTo(target.position);
+                        if (distance < minDistance) {
+                            minDistance = distance;
+                            closestTarget = target;
+                        }
+                    }
+
+                    if (closestTarget) {
+                        const targetQuaternion = new THREE.Quaternion();
+                        const tempMatrix = new THREE.Matrix4();
+                        tempMatrix.lookAt(playerPosition, closestTarget.position, camera.up);
+                        targetQuaternion.setFromRotationMatrix(tempMatrix);
+                        camera.quaternion.slerp(targetQuaternion, 0.12);
+
+                        const currentTime = clock.getElapsedTime();
+                        if (currentTime - lastShotTime > 0.15) {
+                            fireBullet();
+                            lastShotTime = currentTime;
+                        }
+                    }
+                }
+
+                for (let i = bullets.length - 1; i >= 0; i--) {
+                    const bullet = bullets[i];
+                    const prevPosition = bullet.position.clone();
+                    bullet.position.add(bullet.velocity.clone().multiplyScalar(delta));
+
+                    if (bullet.position.length() > 500) {
+                        scene.remove(bullet);
+                        bullets.splice(i, 1);
+                        continue;
+                    }
+                    
+                    const direction = bullet.position.clone().sub(prevPosition);
+                    const distance = direction.length();
+                    direction.normalize();
+                    raycaster.set(prevPosition, direction);
+                    const intersects = raycaster.intersectObjects(targets);
+
+                    if (intersects.length > 0 && intersects[0].distance < distance) {
+                        const hitTarget = intersects[0].object;
+                        scene.remove(bullet);
+                        bullets.splice(i, 1);
+                        const targetIndex = targets.indexOf(hitTarget);
+                        if (targetIndex > -1) {
+                            scene.remove(hitTarget);
+                            targets.splice(targetIndex, 1);
+                        }
+                        score++;
+                        scoreElement.innerText = score;
+                        createTarget();
+                        continue;
+                    }
+                }
+
+                targets.forEach(target => {
+                    target.position.y += Math.sin(clock.getElapsedTime() * 2 + target.position.x) * 0.05;
+                });
+            }
+            
+            renderer.render(scene, camera);
+        }
+
+        init();
+    </script>
+</body>
+</html>
+
